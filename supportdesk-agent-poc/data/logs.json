@@ -1,0 +1,29 @@
+[
+  {
+    "ts": "2026-02-06T08:41:50.700Z",
+    "question": "調達システムで発注申請をしたいのですが、承認フローを教えてください。",
+    "intent": "unknown",
+    "confidence": 0,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 4
+  },
+  {
+    "ts": "2026-02-06T08:47:10.857Z",
+    "question": "調達システムで購買申請の承認フローを教えてください。",
+    "intent": "procurement",
+    "confidence": 0,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 2
+  },
+  {
+    "ts": "2026-02-06T08:51:50.630Z",
+    "question": "??????????????????????????",
+    "intent": "unknown",
+    "confidence": 0,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 1
+  }
+]

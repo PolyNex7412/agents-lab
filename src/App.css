@@ -1,0 +1,27 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.counter-app {
+  padding: 1rem;
+}
+
+.count {
+  font-size: 3rem;
+  margin: 1rem 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.actions button {
+  min-width: 3rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.25rem;
+}
