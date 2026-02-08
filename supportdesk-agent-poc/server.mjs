@@ -1,9 +1,10 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
+import * as mcp from "./mcp-client.mjs";
 
 const app = express();
 app.use(cors());
@@ -96,6 +97,47 @@ function ragRetrieve(text, topK = 3) {
   return { ranked, confidence };
 }
 
+// ---- FAQ + ログの類似検索（マッチ順、参照元付き） ----
+function searchSimilar(text, topK = 10) {
+  const faqs = readJson(FAQ_PATH, []);
+  const logs = readJson(LOGS_PATH, []);
+  const q = (text || "").toLowerCase();
+  const qTokens = tokenize(text);
+
+  const faqItems = faqs.map((f) => {
+    const title = (f.title || "").toLowerCase();
+    const tags = Array.isArray(f.tags) ? f.tags.map((t) => String(t).toLowerCase()) : [];
+    let tagHits = 0;
+    for (const t of tags) if (t && q.includes(t)) tagHits += 1;
+    const titleHit = title && q.includes(title) ? 1 : 0;
+    const docTokens = tokenize(`${f.title} ${tags.join(" ")} ${f.content}`);
+    const overlap = overlapScore(qTokens, docTokens);
+    const score = tagHits * 0.25 + titleHit * 0.2 + overlap * 0.4;
+    return { source: "faq", id: f.id, title: f.title, content: f.content, score, intent: null };
+  });
+
+  const logItems = logs.map((log, idx) => {
+    const docTokens = tokenize(log.question || "");
+    const overlap = overlapScore(qTokens, docTokens);
+    return {
+      source: "log",
+      id: log.ts || "log-" + idx,
+      title: (log.question || "").slice(0, 80) + (log.question && log.question.length > 80 ? "…" : ""),
+      content: null,
+      score: overlap,
+      intent: log.intent || null,
+      ts: log.ts,
+    };
+  });
+
+  const merged = [...faqItems, ...logItems]
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((x) => ({ ...x, score: Number(x.score.toFixed(3)) }));
+  return { items: merged, confidence: merged[0] ? merged[0].score : 0 };
+}
+
 // ---- Agent 3: Answer ----
 async function answerAgent({ question, intent, retrieved }) {
   const best = retrieved?.ranked?.[0];
@@ -162,6 +204,24 @@ app.post("/api/ask", async (req, res) => {
   const question = (req.body?.question ?? "").toString().trim();
   if (!question) return res.status(400).json({ error: "question is required" });
 
+  // MCP 経由を優先（DESIGN.md: 単一の真実の源は MCP サーバー）
+  const mcpResult = await mcp.askSupport({ question, topK: 3 });
+  if (mcpResult) {
+    return res.json({
+      answer: mcpResult.answer,
+      intent: mcpResult.intent,
+      confidence: mcpResult.confidence,
+      needsHuman: mcpResult.needsHuman,
+      citations: mcpResult.citations,
+      similarItems: mcpResult.similarItems ?? [],
+      trace: {
+        ...mcpResult.trace,
+        rag: { confidence: mcpResult.confidence, top: mcpResult.citations },
+      },
+    });
+  }
+
+  // フォールバック: MCP 未使用時の従来実装
   const t0 = Date.now();
   const intentR = intentAgent(question);
   const retrieved = ragRetrieve(question, 3);
@@ -177,7 +237,6 @@ app.post("/api/ask", async (req, res) => {
     judge
   };
 
-  // log
   const logs = readJson(LOGS_PATH, []);
   logs.push({
     ts: new Date().toISOString(),
@@ -190,12 +249,14 @@ app.post("/api/ask", async (req, res) => {
   });
   writeJson(LOGS_PATH, logs);
 
+  const { items: similarItems } = searchSimilar(question, 10);
   res.json({
     answer: ans.answer,
     intent: intentR.intent,
     confidence: Number(retrieved.confidence.toFixed(3)),
     needsHuman: judge.needsHuman,
-    citations: retrieved.ranked.map((r) => ({ id: r.id, title: r.title, score: Number(r.score.toFixed(3)) })),
+    citations: retrieved.ranked.map((r) => ({ id: r.id, title: r.title, score: Number(r.score.toFixed(3)), source: "faq" })),
+    similarItems,
     trace
   });
 });
@@ -213,7 +274,46 @@ app.get("/api/faqs", (_req, res) => {
   });
 });
 
-app.get("/api/metrics", (_req, res) => {
+// 類似検索（FAQ + 過去ログ、マッチ順）
+app.get("/api/similar", (req, res) => {
+  const q = (req.query?.q ?? "").toString().trim();
+  const topK = Math.min(30, Math.max(1, parseInt(req.query?.topK, 10) || 10));
+  if (!q) return res.status(400).json({ error: "q is required" });
+  const data = searchSimilar(q, topK);
+  res.json(data);
+});
+
+// 追加ツール: FAQ検索のみ（ログなし）。MCP 不可時はローカル RAG でフォールバック
+app.get("/api/search", async (req, res) => {
+  const q = (req.query?.q ?? "").toString().trim();
+  const topK = Math.min(20, Math.max(1, parseInt(req.query?.topK, 10) || 5));
+  if (!q) return res.status(400).json({ error: "q is required" });
+  const data = await mcp.searchFaq({ query: q, topK });
+  if (data) return res.json(data);
+  const { ranked, confidence } = ragRetrieve(q, topK);
+  const items = ranked.map((r) => ({
+    id: r.id,
+    title: r.title,
+    tags: r.tags,
+    content: r.content,
+    score: Number((r.score ?? 0).toFixed(3)),
+  }));
+  res.json({ items, confidence: Number(confidence.toFixed(3)) });
+});
+
+// 追加ツール: 意図分類のみ
+app.post("/api/classify", async (req, res) => {
+  const text = (req.body?.text ?? "").toString().trim();
+  if (!text) return res.status(400).json({ error: "text is required" });
+  const data = await mcp.classifyIntent({ text });
+  if (data) return res.json(data);
+  res.status(503).json({ error: "MCP unavailable" });
+});
+
+app.get("/api/metrics", async (_req, res) => {
+  const mcpMetrics = await mcp.getMetrics();
+  if (mcpMetrics) return res.json(mcpMetrics);
+
   const logs = readJson(LOGS_PATH, []);
   const total = logs.length;
   const deflected = logs.filter((l) => !l.needsHuman).length;
@@ -239,4 +339,19 @@ app.get("/api/metrics", (_req, res) => {
   });
 });
 
-app.listen(3000, () => console.log("http://localhost:3000"));
+function startServer(port) {
+  const server = app.listen(port, () => console.log("http://localhost:" + server.address().port));
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE" && port < 3010) {
+      console.warn("ポート " + port + " は使用中のため " + (port + 1) + " で再試行します。");
+      startServer(port + 1);
+    } else if (err.code === "EADDRINUSE") {
+      console.error("ポート " + port + " は使用中です。既存の node プロセスを終了してください。");
+      process.exit(1);
+    } else {
+      throw err;
+    }
+  });
+}
+const PORT = Number(process.env.PORT) || 3000;
+startServer(PORT);

@@ -1,137 +1,572 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SupportDesk RAG × Agent PoC</title>
+  <title>SupportDesk - 社内サポート</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; background:#f6f8fb; color:#1f2a37; }
-    .wrap { max-width: 980px; margin: 28px auto; padding: 0 16px; display:grid; gap:16px; }
-    .card { background:#fff; border:1px solid #e5eaf1; border-radius:12px; padding:16px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
-    textarea { width:100%; height:140px; padding:12px; border-radius:10px; border:1px solid #d7e0ea; }
-    button { padding:10px 14px; border-radius:10px; border:1px solid #d7e0ea; background:#2563eb; color:#fff; cursor:pointer; }
-    button:disabled { opacity:.6; cursor:not-allowed; }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .pill { padding:4px 10px; border-radius:999px; border:1px solid #d7e0ea; background:#f6f8fb; font-size:12px; }
-    .grid3 { display:grid; grid-template-columns: 1fr; gap:12px; }
-    @media(min-width:760px){ .grid3{ grid-template-columns: repeat(3,1fr);} }
-    pre { white-space:pre-wrap; margin:0; }
-    details summary { cursor:pointer; }
-    .muted { color:#607085; font-size:12px; }
+    /* MS365 / Fluent 風 */
+    :root {
+      --ms-bg: #f3f2f1;
+      --ms-surface: #ffffff;
+      --ms-border: #edebe9;
+      --ms-border-strong: #d2d0ce;
+      --ms-primary: #0078d4;
+      --ms-primary-hover: #106ebe;
+      --ms-primary-light: #e6f2fa;
+      --ms-text: #323130;
+      --ms-text-secondary: #605e5c;
+      --ms-topbar: #201f1e;
+      --ms-topbar-text: #ffffff;
+      --ms-radius: 4px;
+      --ms-shadow: 0 1.6px 3.6px rgba(0,0,0,.08), 0 0.4px 0.9px rgba(0,0,0,.04);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Segoe UI Web (West European)", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--ms-text);
+      background: var(--ms-bg);
+      min-height: 100vh;
+    }
+
+    .topbar {
+      height: 48px;
+      background: var(--ms-topbar);
+      color: var(--ms-topbar-text);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .topbar-icon {
+      width: 24px;
+      height: 24px;
+      background: var(--ms-primary);
+      border-radius: var(--ms-radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .topbar-title { font-weight: 600; font-size: 15px; }
+    .topbar-sub { font-size: 12px; color: rgba(255,255,255,.8); margin-left: 4px; }
+
+    /* タブ */
+    .tabs-wrap {
+      background: var(--ms-surface);
+      border-bottom: 1px solid var(--ms-border);
+      padding: 0 20px 0 0;
+    }
+    .tabs {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      gap: 4px;
+    }
+    .tab {
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 600;
+      color: var(--ms-text-secondary);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab:hover { color: var(--ms-text); }
+    .tab.active {
+      color: var(--ms-primary);
+      border-bottom-color: var(--ms-primary);
+    }
+
+    .main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      display: grid;
+      gap: 20px;
+    }
+    .panel { display: none; }
+    .panel.active { display: grid; }
+
+    .card {
+      background: var(--ms-surface);
+      border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius);
+      padding: 20px;
+      box-shadow: var(--ms-shadow);
+    }
+    .card-title { margin: 0 0 4px 0; font-size: 16px; font-weight: 600; color: var(--ms-text); }
+    .card-desc { margin: 0; font-size: 12px; color: var(--ms-text-secondary); }
+
+    .field-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ms-text-secondary);
+      margin-bottom: 6px;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--ms-border-strong);
+      border-radius: var(--ms-radius);
+      font: inherit;
+      color: var(--ms-text);
+    }
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--ms-primary);
+      box-shadow: 0 0 0 1px var(--ms-primary);
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    input::placeholder, textarea::placeholder { color: var(--ms-text-secondary); opacity: .8; }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--ms-radius);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background .15s;
+    }
+    .btn-primary { background: var(--ms-primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--ms-primary-hover); }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-secondary {
+      background: var(--ms-surface);
+      color: var(--ms-text);
+      border: 1px solid var(--ms-border-strong);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--ms-border); }
+
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      padding: 4px 10px;
+      border-radius: 2px;
+      font-size: 12px;
+      background: var(--ms-primary-light);
+      color: var(--ms-primary);
+      border: 1px solid rgba(0,120,212,.2);
+    }
+
+    .answer-body {
+      white-space: pre-wrap;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--ms-text);
+    }
+    .answer-body.placeholder { color: var(--ms-text-secondary); }
+    details {
+      margin-top: 12px;
+      border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius);
+      overflow: hidden;
+    }
+    details summary {
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ms-text-secondary);
+      cursor: pointer;
+      background: var(--ms-bg);
+      user-select: none;
+    }
+    details summary:hover { background: var(--ms-border); }
+    details[open] summary { border-bottom: 1px solid var(--ms-border); }
+    details pre {
+      margin: 0;
+      padding: 12px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--ms-text-secondary);
+      background: var(--ms-surface);
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .kpi {
+      padding: 16px;
+      background: var(--ms-bg);
+      border-radius: var(--ms-radius);
+      border: 1px solid var(--ms-border);
+    }
+    .kpi-label { font-size: 12px; color: var(--ms-text-secondary); margin-bottom: 4px; }
+    .kpi-value { font-size: 24px; font-weight: 600; color: var(--ms-text); }
+
+    /* FAQ検索結果 */
+    .search-result {
+      padding: 12px;
+      border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius);
+      margin-bottom: 8px;
+      background: var(--ms-surface);
+    }
+    .search-result-title { font-weight: 600; margin-bottom: 4px; }
+    .search-result-meta { font-size: 12px; color: var(--ms-text-secondary); margin-bottom: 6px; }
+    .search-result-content { font-size: 13px; line-height: 1.5; }
+    .similar-list { margin-top: 8px; }
+    .similar-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--ms-border);
+      border-radius: var(--ms-radius);
+      margin-bottom: 8px;
+      background: var(--ms-surface);
+    }
+    .similar-item-source {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .similar-item-source.faq { background: var(--ms-primary-light); color: var(--ms-primary); }
+    .similar-item-source.log { background: #e8f4ea; color: #107c10; }
+    .similar-item-body { flex: 1; min-width: 0; }
+    .similar-item-title { font-size: 13px; margin-bottom: 2px; }
+    .similar-item-meta { font-size: 11px; color: var(--ms-text-secondary); }
+
+    /* ログテーブル */
+    .log-table-wrap { overflow-x: auto; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--ms-border); }
+    th { font-weight: 600; color: var(--ms-text-secondary); background: var(--ms-bg); }
+    tr:hover { background: var(--ms-bg); }
+    .log-needs-human { color: #c4314b; }
+    .log-ok { color: #107c10; }
+    .empty-state { color: var(--ms-text-secondary); padding: 24px; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <h2 style="margin:0;">SupportDesk RAG × AI-Agent PoC</h2>
-        <span class="muted">Localhost demo (no infra)</span>
-      </div>
-      <p class="muted" style="margin-top:6px;">Intent → RAG → Answer → Human判定 を1回の問い合わせで可視化します。</p>
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon" aria-hidden="true">S</div>
+      <span class="topbar-title">SupportDesk</span>
+      <span class="topbar-sub">社内サポート</span>
+    </div>
+  </header>
+
+  <nav class="tabs-wrap">
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="ask">問い合わせ</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="search">FAQ検索</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="logs">ログ</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="dashboard">ダッシュボード</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- 問い合わせ -->
+    <div id="panel-ask" class="panel active" role="tabpanel">
+      <section class="card">
+        <h2 class="card-title">問い合わせ</h2>
+        <p class="card-desc">質問を入力し、ナレッジに基づいた回答を取得します。</p>
+        <label class="field-label" for="q">質問</label>
+        <textarea id="q" placeholder="例：VPNがつながらない / パスワードをリセットしたい"></textarea>
+        <div class="row" style="margin-top:12px;">
+          <button type="button" class="btn btn-primary" id="ask">回答を取得</button>
+          <div class="badges" id="badges"></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="card-title">類似の過去問い合わせ（マッチ順）</h2>
+        <p class="card-desc">FAQ と過去ログから類似度の高い順に表示します。</p>
+        <div id="similar-items" class="similar-list"></div>
+      </section>
+      <section class="card">
+        <h2 class="card-title">1次回答</h2>
+        <pre id="answer" class="answer-body placeholder">ここに回答が表示されます</pre>
+        <details>
+          <summary>Trace（Agent内訳）</summary>
+          <pre id="trace"></pre>
+        </details>
+        <details>
+          <summary>根拠（参照したFAQ・過去ログ）</summary>
+          <pre id="cites"></pre>
+        </details>
+      </section>
     </div>
 
-    <div class="card">
-      <label class="muted">問い合わせ</label>
-      <textarea id="q" placeholder="例：VPNがつながらない。エラーが出る。"></textarea>
-      <div class="row" style="margin-top:10px;">
-        <button id="ask">Ask</button>
-        <span id="badges"></span>
-      </div>
+    <!-- FAQ検索 -->
+    <div id="panel-search" class="panel" role="tabpanel">
+      <section class="card">
+        <h2 class="card-title">FAQ検索</h2>
+        <p class="card-desc">キーワードでナレッジを検索します。回答は生成せず候補のみ表示します。</p>
+        <label class="field-label" for="search-q">検索キーワード</label>
+        <div class="row" style="gap:8px; align-items:flex-end;">
+          <input type="text" id="search-q" placeholder="例：VPN、パスワード、購買" style="flex:1; min-width:0;" />
+          <button type="button" class="btn btn-primary" id="search-btn">検索</button>
+        </div>
+        <div id="search-results" style="margin-top:16px;"></div>
+      </section>
     </div>
 
-    <div class="card">
-      <h3 style="margin:0 0 8px;">回答</h3>
-      <pre id="answer" class="muted">ここに回答が表示されます</pre>
-      <details style="margin-top:10px;">
-        <summary>Trace（Agent内訳）</summary>
-        <pre id="trace" class="muted" style="margin-top:8px;"></pre>
-      </details>
-      <details style="margin-top:10px;">
-        <summary>Citations（参照FAQ）</summary>
-        <pre id="cites" class="muted" style="margin-top:8px;"></pre>
-      </details>
+    <!-- ログ -->
+    <div id="panel-logs" class="panel" role="tabpanel">
+      <section class="card">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="card-title">問い合わせログ</h2>
+            <p class="card-desc">過去の問い合わせと判定結果</p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="logs-refresh">更新</button>
+        </div>
+        <div class="log-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日時</th>
+                <th>質問</th>
+                <th>Intent</th>
+                <th>信頼度</th>
+                <th>要対応</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody"></tbody>
+          </table>
+        </div>
+        <div id="logs-empty" class="empty-state" style="display:none;">ログがありません</div>
+      </section>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <h3 style="margin:0;">Mini Dashboard</h3>
-        <button id="refresh" style="background:#111827;">Refresh</button>
-      </div>
-      <div class="grid3" style="margin-top:10px;">
-        <div class="card" style="padding:12px; box-shadow:none;">
-          <div class="muted">Total</div><div id="m_total" style="font-size:22px; font-weight:700;">-</div>
+    <!-- ダッシュボード -->
+    <div id="panel-dashboard" class="panel" role="tabpanel">
+      <section class="card">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="card-title">ダッシュボード</h2>
+            <p class="card-desc">問い合わせの集計</p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="refresh">更新</button>
         </div>
-        <div class="card" style="padding:12px; box-shadow:none;">
-          <div class="muted">Deflection Rate</div><div id="m_def" style="font-size:22px; font-weight:700;">-</div>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi-label">総件数</div>
+            <div class="kpi-value" id="m_total">-</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">自動解決率</div>
+            <div class="kpi-value" id="m_def">-</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">平均信頼度</div>
+            <div class="kpi-value" id="m_conf">-</div>
+          </div>
         </div>
-        <div class="card" style="padding:12px; box-shadow:none;">
-          <div class="muted">Avg Confidence</div><div id="m_conf" style="font-size:22px; font-weight:700;">-</div>
-        </div>
-      </div>
-      <details style="margin-top:10px;">
-        <summary>Intent breakdown</summary>
-        <pre id="m_intents" class="muted" style="margin-top:8px;"></pre>
-      </details>
+        <details style="margin-top:16px;">
+          <summary>Intent 内訳</summary>
+          <pre id="m_intents"></pre>
+        </details>
+      </section>
     </div>
-  </div>
+  </main>
 
 <script>
   const $ = (id) => document.getElementById(id);
 
-  function badge(text){
+  // タブ切り替え
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const id = tab.dataset.tab;
+      document.querySelectorAll(".tab").forEach((t) => {
+        t.classList.toggle("active", t === tab);
+        t.setAttribute("aria-selected", t === tab ? "true" : "false");
+      });
+      document.querySelectorAll(".panel").forEach((p) => {
+        p.classList.toggle("active", p.id === "panel-" + id);
+      });
+      if (id === "logs") loadLogs();
+    });
+  });
+
+  function badge(text) {
     const s = document.createElement("span");
     s.className = "pill";
     s.textContent = text;
     return s;
   }
 
-  async function loadMetrics(){
-    const r = await fetch("/api/metrics");
-    const m = await r.json();
-    $("m_total").textContent = m.total;
-    $("m_def").textContent = (m.deflectionRate * 100).toFixed(1) + "%";
-    $("m_conf").textContent = m.avgConfidence.toFixed(3);
-    $("m_intents").textContent = JSON.stringify(m.byIntent, null, 2);
+  async function loadMetrics() {
+    try {
+      const r = await fetch("/api/metrics");
+      const m = await r.json();
+      $("m_total").textContent = m.total;
+      $("m_def").textContent = (m.deflectionRate * 100).toFixed(1) + "%";
+      $("m_conf").textContent = m.avgConfidence.toFixed(3);
+      $("m_intents").textContent = JSON.stringify(m.byIntent, null, 2);
+    } catch (e) {
+      $("m_total").textContent = "-";
+      $("m_def").textContent = "-";
+      $("m_conf").textContent = "-";
+    }
+  }
+
+  async function loadLogs() {
+    const tbody = $("logs-tbody");
+    const empty = $("logs-empty");
+    tbody.innerHTML = "";
+    try {
+      const r = await fetch("/api/logs");
+      const logs = await r.json();
+      if (!logs.length) {
+        empty.style.display = "block";
+        return;
+      }
+      empty.style.display = "none";
+      logs.slice().reverse().forEach((row) => {
+        const tr = document.createElement("tr");
+        const ts = row.ts ? new Date(row.ts).toLocaleString("ja") : "-";
+        const needsHuman = row.needsHuman ? "要対応" : "解決";
+        tr.innerHTML =
+          "<td>" + escapeHtml(ts) + "</td>" +
+          "<td>" + escapeHtml((row.question || "").slice(0, 60)) + (row.question && row.question.length > 60 ? "…" : "") + "</td>" +
+          "<td>" + escapeHtml(row.intent || "-") + "</td>" +
+          "<td>" + (row.confidence != null ? row.confidence.toFixed(3) : "-") + "</td>" +
+          "<td class=\"" + (row.needsHuman ? "log-needs-human" : "log-ok") + "\">" + escapeHtml(needsHuman) + "</td>";
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      empty.textContent = "ログの取得に失敗しました";
+      empty.style.display = "block";
+    }
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement("div");
+    div.textContent = s;
+    return div.innerHTML;
   }
 
   $("refresh").onclick = loadMetrics;
+  $("logs-refresh").onclick = loadLogs;
 
   $("ask").onclick = async () => {
     const question = $("q").value.trim();
-    if(!question) return;
-
+    if (!question) return;
     $("ask").disabled = true;
-    $("answer").textContent = "生成中...";
+    const answerEl = $("answer");
+    answerEl.textContent = "回答を生成しています...";
+    answerEl.classList.remove("placeholder");
     $("trace").textContent = "";
     $("cites").textContent = "";
     $("badges").innerHTML = "";
-
-    try{
+    $("similar-items").innerHTML = "";
+    try {
       const r = await fetch("/api/ask", {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question })
       });
       const data = await r.json();
-
-      if(data.error){
-        $("answer").textContent = "Error: " + data.error;
+      if (data.error) {
+        answerEl.textContent = "エラー: " + data.error;
         return;
       }
-
-      $("answer").textContent = data.answer;
+      answerEl.textContent = data.answer;
       $("trace").textContent = JSON.stringify(data.trace, null, 2);
       $("cites").textContent = JSON.stringify(data.citations, null, 2);
+
+      const similarEl = $("similar-items");
+      if (data.similarItems && data.similarItems.length) {
+        similarEl.innerHTML = data.similarItems.map(function (item) {
+          const srcLabel = item.source === "log" ? "過去ログ" : "FAQ";
+          const meta = "スコア: " + (item.score != null ? item.score : "-") + (item.intent ? " | " + item.intent : "");
+          const content = item.content ? "<div class=\"similar-item-meta\">" + escapeHtml(item.content.slice(0, 120)) + (item.content.length > 120 ? "…" : "") + "</div>" : "";
+          return "<div class=\"similar-item\">" +
+            "<span class=\"similar-item-source " + (item.source || "") + "\">" + escapeHtml(srcLabel) + "</span>" +
+            "<div class=\"similar-item-body\">" +
+            "<div class=\"similar-item-title\">" + escapeHtml(item.title || "") + "</div>" +
+            "<div class=\"similar-item-meta\">" + escapeHtml(meta) + "</div>" + content +
+            "</div></div>";
+        }).join("");
+      } else {
+        similarEl.innerHTML = "<p class=\"empty-state\">類似の問い合わせはありません</p>";
+      }
 
       const b = $("badges");
       b.appendChild(badge("intent: " + data.intent));
       b.appendChild(badge("confidence: " + data.confidence));
-      b.appendChild(badge("needsHuman: " + data.needsHuman));
+      b.appendChild(badge("要エスカレ: " + (data.needsHuman ? "はい" : "いいえ")));
+      if (data.trace && data.trace.judge && data.trace.judge.reason) {
+        b.appendChild(badge("判定理由: " + data.trace.judge.reason));
+      }
       await loadMetrics();
     } finally {
       $("ask").disabled = false;
     }
   };
+
+  $("search-btn").onclick = async () => {
+    const q = $("search-q").value.trim();
+    if (!q) return;
+    const container = $("search-results");
+    container.innerHTML = "<p class=\"empty-state\">検索中...</p>";
+    try {
+      const r = await fetch("/api/search?q=" + encodeURIComponent(q) + "&topK=5");
+      const text = await r.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (_) {
+        container.innerHTML = "<p class=\"empty-state\">検索に失敗しました。サーバー（npm run dev）が起動しているか確認してください。</p>";
+        return;
+      }
+      if (data && data.error) {
+        container.innerHTML = "<p class=\"empty-state\">" + escapeHtml(data.error) + "</p>";
+        return;
+      }
+      if (!data || !Array.isArray(data.items)) {
+        container.innerHTML = "<p class=\"empty-state\">検索に失敗しました</p>";
+        return;
+      }
+      if (!data.items.length) {
+        container.innerHTML = "<p class=\"empty-state\">該当するFAQがありません</p>";
+        return;
+      }
+      container.innerHTML = data.items.map((item) =>
+        "<div class=\"search-result\">" +
+        "<div class=\"search-result-title\">" + escapeHtml(item.id + " " + (item.title || "")) + "</div>" +
+        "<div class=\"search-result-meta\">スコア: " + (item.score != null ? item.score : "-") + " | 信頼度: " + (data.confidence != null ? Number(data.confidence).toFixed(3) : "-") + "</div>" +
+        "<div class=\"search-result-content\">" + escapeHtml(item.content || "") + "</div>" +
+        "</div>"
+      ).join("");
+    } catch (e) {
+      container.innerHTML = "<p class=\"empty-state\">エラー: " + escapeHtml(e.message) + "</p>";
+    }
+  };
+
+  $("search-q").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("search-btn").click();
+  });
 
   loadMetrics();
 </script>

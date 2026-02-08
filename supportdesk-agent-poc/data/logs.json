@@ -1,29 +1,142 @@
 [
   {
-    "ts": "2026-02-06T08:41:50.700Z",
-    "question": "調達システムで発注申請をしたいのですが、承認フローを教えてください。",
-    "intent": "unknown",
-    "confidence": 0,
-    "needsHuman": true,
+    "ts": "2026-02-07T09:15:00.000Z",
+    "question": "VPNが在宅勤務でつながらないです。",
+    "intent": "network_vpn",
+    "confidence": 0.72,
+    "needsHuman": false,
     "usedLLM": false,
-    "latencyMs": 4
+    "latencyMs": 12,
+    "channel": "mcp"
   },
   {
-    "ts": "2026-02-06T08:47:10.857Z",
-    "question": "調達システムで購買申請の承認フローを教えてください。",
+    "ts": "2026-02-07T09:22:30.000Z",
+    "question": "パスワードを忘れてログインできません。リセット方法を教えてください。",
+    "intent": "account_password",
+    "confidence": 0.85,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 8,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T09:45:00.000Z",
+    "question": "購買申請の承認フローを教えてください。",
     "intent": "procurement",
-    "confidence": 0,
-    "needsHuman": true,
+    "confidence": 0.68,
+    "needsHuman": false,
     "usedLLM": false,
-    "latencyMs": 2
+    "latencyMs": 15,
+    "channel": "mcp"
   },
   {
-    "ts": "2026-02-06T08:51:50.630Z",
-    "question": "??????????????????????????",
+    "ts": "2026-02-07T10:10:00.000Z",
+    "question": "Outlookでメールが送信できない。",
+    "intent": "email_issue",
+    "confidence": 0.55,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 11,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T10:35:00.000Z",
+    "question": "リモートで接続が不安定です。",
+    "intent": "network_vpn",
+    "confidence": 0.48,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 9,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T11:00:00.000Z",
+    "question": "発注書のPO番号はどこで確認できますか？",
+    "intent": "procurement",
+    "confidence": 0.62,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 14,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T11:20:00.000Z",
+    "question": "プリンターのインクが切れました。",
     "intent": "unknown",
+    "confidence": 0.12,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 5,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T11:45:00.000Z",
+    "question": "SMTPエラーでメール送信に失敗します。",
+    "intent": "email_issue",
+    "confidence": 0.78,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 10,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T13:00:00.000Z",
+    "question": "取引先を新規登録したいです。",
+    "intent": "procurement",
+    "confidence": 0.58,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 13,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T13:30:00.000Z",
+    "question": "認証アプリの時刻が合わないと言われます。",
+    "intent": "network_vpn",
+    "confidence": 0.35,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 7,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T14:00:00.000Z",
+    "question": "見積書の添付は必須ですか？",
+    "intent": "procurement",
+    "confidence": 0.71,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 9,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T14:25:00.000Z",
+    "question": "勤怠システムにログインできない。",
+    "intent": "account_password",
+    "confidence": 0.22,
+    "needsHuman": true,
+    "usedLLM": false,
+    "latencyMs": 6,
+    "channel": "web"
+  },
+  {
+    "ts": "2026-02-07T15:00:00.000Z",
+    "question": "緊急で購買の例外申請をしたい。",
+    "intent": "procurement",
+    "confidence": 0.65,
+    "needsHuman": false,
+    "usedLLM": false,
+    "latencyMs": 16,
+    "channel": "mcp"
+  },
+  {
+    "ts": "2026-02-07T10:03:16.219Z",
+    "question": "パスワードをリセットしたい。",
+    "intent": "account_password",
     "confidence": 0,
     "needsHuman": true,
     "usedLLM": false,
-    "latencyMs": 1
+    "latencyMs": 5,
+    "channel": "mcp"
   }
 ]
